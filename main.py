@@ -22,7 +22,6 @@ async def analyser_ecriture(file: UploadFile = File(...)):
         contents = await file.read()
         base64_image = base64.b64encode(contents).decode('utf-8')
 
-        # Remplace cette partie dans ton main.py
         response = client.chat.completions.create(
             model="gpt-4o",
             messages=[
@@ -31,31 +30,28 @@ async def analyser_ecriture(file: UploadFile = File(...)):
                     "content": [
                         {
                             "type": "text", 
-                            "text": """Tu es un correcteur expert en langue arabe. 
-                            Ta mission : Compter et vérifier précisément 10 phrases manuscrites.
-                            
-                            LES 10 PHRASES ATTENDUES :
+                            "text": """Tu es un professeur de calligraphie arabe très strict. 
+                            Vérifie ce manuscrit par rapport à cette liste exacte de 10 mots :
                             1. هَذَا مَسْجِدٌ  2. هَذَا كِتَابٌ  3. هَذَا قَلَمٌ  4. هَذَا مِفْتَاحٌ  5. هَذَا مَكْتَبٌ 
                             6. هَذَا سَرِيرٌ  7. هَذَا كُرْسِيٌّ  8. هَذَا بَيْتٌ  9. هَذَا بَابٌ  10. هَذَا وَلَدٌ
 
-                            INSTRUCTIONS CRITIQUES :
-                            1. Analyse l'image ligne par ligne, de droite à gauche.
-                            2. Identifie chaque mot et chaque voyelle (tanwin final ٌ ).
-                            3. Ne conclus pas qu'il manque des phrases avant d'avoir scanné TOUTE l'image.
+                            MÉTHODE DE CORRECTION :
+                            - Regarde chaque mot individuellement.
+                            - Ne critique pas un mot si les points et les voyelles (shadda, tanwin) sont présents, même s'ils sont écrits de façon manuscrite.
+                            - Si un mot est écrit correctement, NE DIS PAS qu'il est faux.
                             
-                            RÉPONSE (JSON UNIQUEMENT) :
-                            - Si les 10 sont là : {"status": "SUCCESS", "message": "Parfait ! Les 10 phrases sont bien écrites et complètes."}
-                            - Si une phrase manque : {"status": "FAIL", "message": "Il semble que tu as oublié la phrase : [Nom du mot]."}
-                            - Si une voyelle est fausse : {"status": "FAIL", "message": "Vérifie la voyelle finale du mot [Nom du mot]."}"""
+                            RÉPONSE JSON :
+                            {"status": "SUCCESS" ou "FAIL", "message": "ton feedback en français"}"""
                         },
                         {
                             "type": "image_url",
-                            "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}
+                            "image_url": {"url": f"data:image/jpeg;base64,{base64_image}", "detail": "high"}
                         }
                     ],
                 }
             ],
-            temperature=0.1 # Rend l'IA très factuelle et moins distraite
+            temperature=0, # Force l'IA à être 100% factuelle (pas de créativité)
+            top_p=1
         )
         return response.choices[0].message.content
     except Exception as e:
