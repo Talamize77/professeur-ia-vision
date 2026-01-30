@@ -13,7 +13,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Configuration pour OpenAI
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 @app.post("/analyser-ecriture")
@@ -22,7 +21,6 @@ async def analyser_ecriture(file: UploadFile = File(...)):
         contents = await file.read()
         base64_image = base64.b64encode(contents).decode('utf-8')
 
-        # La correction est ici : tout ce bloc doit être aligné sous 'contents'
         response = client.chat.completions.create(
             model="gpt-4o",
             messages=[
@@ -31,27 +29,28 @@ async def analyser_ecriture(file: UploadFile = File(...)):
                     "content": [
                         {
                             "type": "text", 
-                            "text": """Tu es un professeur d'arabe strict. 
-                            Vérifie ce manuscrit par rapport à cette liste exacte :
-                            هَذَا مَسْجِدٌ, هَذَا كِتَابٌ, هَذَا قَلَمٌ, هَذَا مِفْتَاحٌ, هَذَا مَكْتَبٌ, 
-                            هَذَا سَرِيرٌ, هَذَا كُرْسِيٌّ, هَذَا بَيْتٌ, هَذَا بَابٌ, هَذَا وَلَدٌ.
+                            "text": """Tu es un expert en lecture d'arabe manuscrit. 
+                            TACHE : Vérifie si l'élève a écrit ces 10 phrases : هَذَا مَسْجِدٌ, هَذَا كِتَابٌ, هَذَا قَلَمٌ, هَذَا مِفْتَاحٌ, هَذَا مَكْتَبٌ, هَذَا سَرِيرٌ, هَذَا كُرْسِيٌّ, هَذَا بَيْتٌ, هَذَا بَابٌ, هَذَا وَلَدٌ.
 
-                            RÈGLES :
-                            1. Si le mot est lisible et que les points/voyelles sont là, valide-le impérativement.
-                            2. NE signale PAS d'erreur sur 'كُرْسِيٌّ' si la shadda et le tanwin sont visibles.
-                            3. Réponds UNIQUEMENT en JSON : {"status": "SUCCESS", "message": "Bravo !"} ou {"status": "FAIL", "message": "Erreur précise..."}"""
+                            CONSIGNES DE RIGUEUR :
+                            1. Sois indulgent avec les formes manuscrites : si le tanwin (ٌ) ou les points sont présents, même stylisés, VALIDE le mot.
+                            2. NE DIS PAS qu'il manque un tanwin si on voit un petit gribouillage au-dessus de la dernière lettre.
+                            3. Si le mot 'كُرْسِيٌّ' est écrit avec ses points et une marque au-dessus, il est CORRECT.
+                            
+                            REPONDS UNIQUEMENT EN JSON :
+                            {"status": "SUCCESS", "message": "Feedback positif"} ou {"status": "FAIL", "message": "Feedback précis"}"""
                         },
                         {
                             "type": "image_url",
                             "image_url": {
                                 "url": f"data:image/jpeg;base64,{base64_image}",
-                                "detail": "high"
+                                "detail": "high" 
                             }
                         }
                     ],
                 }
             ],
-            temperature=0
+            temperature=0  # Obligatoire pour éviter les hallucinations
         )
         return response.choices[0].message.content
     except Exception as e:
