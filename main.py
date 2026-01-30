@@ -22,37 +22,37 @@ async def analyser_ecriture(file: UploadFile = File(...)):
         contents = await file.read()
         base64_image = base64.b64encode(contents).decode('utf-8')
 
-        response = client.chat.completions.create(
-            model="gpt-4o",
-            messages=[
+        # CODE À METTRE SUR GITHUB (main.py)
+response = client.chat.completions.create(
+    model="gpt-4o", # Le modèle le plus stable pour la vision
+    messages=[
+        {
+            "role": "user",
+            "content": [
                 {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "text", 
-                            "text": """Tu es un professeur de calligraphie arabe très strict. 
-                            Vérifie ce manuscrit par rapport à cette liste exacte de 10 mots :
-                            1. هَذَا مَسْجِدٌ  2. هَذَا كِتَابٌ  3. هَذَا قَلَمٌ  4. هَذَا مِفْتَاحٌ  5. هَذَا مَكْتَبٌ 
-                            6. هَذَا سَرِيرٌ  7. هَذَا كُرْسِيٌّ  8. هَذَا بَيْتٌ  9. هَذَا بَابٌ  10. هَذَا وَلَدٌ
+                    "type": "text", 
+                    "text": """Tu es un professeur d'arabe strict. 
+                    Vérifie ce manuscrit par rapport à cette liste exacte :
+                    هَذَا مَسْجِدٌ, هَذَا كِتَابٌ, هَذَا قَلَمٌ, هَذَا مِفْتَاحٌ, هَذَا مَكْتَبٌ, 
+                    هَذَا سَرِيرٌ, هَذَا كُرْسِيٌّ, هَذَا بَيْتٌ, هَذَا بَابٌ, هَذَا وَلَدٌ.
 
-                            MÉTHODE DE CORRECTION :
-                            - Regarde chaque mot individuellement.
-                            - Ne critique pas un mot si les points et les voyelles (shadda, tanwin) sont présents, même s'ils sont écrits de façon manuscrite.
-                            - Si un mot est écrit correctement, NE DIS PAS qu'il est faux.
-                            
-                            RÉPONSE JSON :
-                            {"status": "SUCCESS" ou "FAIL", "message": "ton feedback en français"}"""
-                        },
-                        {
-                            "type": "image_url",
-                            "image_url": {"url": f"data:image/jpeg;base64,{base64_image}", "detail": "high"}
-                        }
-                    ],
+                    RÈGLES :
+                    1. Si le mot est lisible et que les points/voyelles sont là, valide-le impérativement.
+                    2. NE signale PAS d'erreur sur 'كُرْسِيٌّ' si la shadda et le tanwin sont visibles.
+                    3. Réponds UNIQUEMENT en JSON : {"status": "SUCCESS", "message": "Bravo !"} ou {"status": "FAIL", "message": "Erreur précise..."}"""
+                },
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:image/jpeg;base64,{base64_image}",
+                        "detail": "high"  # Indispensable pour voir les voyelles
+                    }
                 }
             ],
-            temperature=0, # Force l'IA à être 100% factuelle (pas de créativité)
-            top_p=1
-        )
+        }
+    ],
+    temperature=0 # Supprime les erreurs aléatoires
+)
         return response.choices[0].message.content
     except Exception as e:
         return {"status": "ERROR", "message": str(e)}
