@@ -13,7 +13,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Configuration DeepSeek
+# On utilise l'interface OpenAI qui est compatible avec DeepSeek
 client = OpenAI(
     api_key=os.getenv("DEEPSEEK_API_KEY"), 
     base_url="https://api.deepseek.com"
@@ -25,18 +25,27 @@ async def analyser_ecriture(file: UploadFile = File(...)):
         contents = await file.read()
         base64_image = base64.b64encode(contents).decode('utf-8')
 
-        # Structure corrigée pour DeepSeek Vision
+        # CHANGEMENT ICI : On utilise le modèle chat qui supporte la vision chez DeepSeek
         response = client.chat.completions.create(
-            model="deepseek-reasoner", # On utilise le modèle le plus performant
+            model="deepseek-chat", 
             messages=[
                 {
                     "role": "user",
-                    "content": f"Analyse cette photo d'écriture arabe. L'élève doit avoir écrit : هَذَا مَسْجِدٌ, هَذَا كِتَابٌ, هَذَا قَلَمٌ, هَذَا مِفْتَاحٌ, هَذَا مَكْتَبٌ, هَذَا سَرِيرٌ, هَذَا كُرْسِيٌّ, هَذَا بَيْتٌ, هَذَا بَابٌ, هَذَا وَلَدٌ. Réponds en JSON : {{'status': 'SUCCESS' ou 'FAIL', 'message': 'ton commentaire'}}. Voici l'image en base64 : data:image/jpeg;base64,{base64_image}"
+                    "content": [
+                        {"type": "text", "text": "Tu es un expert en calligraphie arabe. Analyse cette photo. L'élève doit avoir écrit 10 phrases commençant par 'Haza'. Vérifie l'orthographe et les voyelles. Réponds UNIQUEMENT en JSON : {'status': 'SUCCESS' ou 'FAIL', 'message': 'ton commentaire court'}"},
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{base64_image}"
+                            }
+                        }
+                    ]
                 }
-            ]
+            ],
+            max_tokens=300
         )
         
         return response.choices[0].message.content
 
     except Exception as e:
-        return {"status": "ERROR", "message": str(e)}
+        return {"status": "ERROR", "message": "Erreur technique : " + str(e)}
