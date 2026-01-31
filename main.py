@@ -7,6 +7,7 @@ from openai import OpenAI
 
 app = FastAPI()
 
+# Autorisation pour que Systeme.io puisse parler au serveur
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -14,14 +15,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Utilisation de tes variables Render
+# Initialisation avec tes variables Render
 client_openai = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 document_client = DocumentAnalysisClient(
     endpoint=os.getenv("AZURE_ENDPOINT"), 
     credential=AzureKeyCredential(os.getenv("AZURE_KEY"))
 )
 
-# LA LISTE OFFICIELLE REVIENT ICI POUR PLUS DE SÉCURITÉ
+# LA VÉRITÉ EST ICI : L'IA comparera la photo à ces mots uniquement
 LISTE_OFFICIELLE = "هَذَا مَسْجِدٌ, هَذَا كِتَابٌ, هَذَا قَلَمٌ, هَذَا مِفْتَاحٌ, هَذَا مَكْتَبٌ, هَذَا سَرِيرٌ, هَذَا كُرْسِيٌّ, هَذَا بَيْتٌ, هَذَا بَابٌ, هَذَا وَلَدٌ"
 
 @app.post("/analyser-ecriture")
@@ -29,17 +30,17 @@ async def analyser_ecriture(file: UploadFile = File(...)):
     try:
         image_data = await file.read()
         
-        # 1. Azure lit la photo
+        # 1. Azure scanne les traits sur la photo
         poller = document_client.begin_analyze_document("prebuilt-read", image_data)
         result = poller.result()
         texte_lu = " ".join([l.content for p in result.pages for l in p.lines])
 
-        # 2. OpenAI compare avec la liste fixe
+        # 2. OpenAI compare le texte lu avec la LISTE_OFFICIELLE
         response = client_openai.chat.completions.create(
             model="gpt-4o",
             messages=[
-                {"role": "system", "content": f"Tu es un prof d'arabe. Voici les mots corrects : {LISTE_OFFICIELLE}. Compare avec ce que l'élève a écrit : {texte_lu}. Sois précis sur les erreurs de lettres ou de harakats."},
-                {"role": "user", "content": "Analyse ma photo."}
+                {"role": "system", "content": f"Tu es un professeur d'arabe. On vient de scanner une photo d'exercice. Voici les mots que l'élève devait écrire : {LISTE_OFFICIELLE}. Voici ce que j'ai lu sur sa photo : '{texte_lu}'. Liste précisément les erreurs (lettres manquantes ou harakats faux). Sois encourageant mais très précis sur la correction."},
+                {"role": "user", "content": "Corrige mon écriture s'il te plaît."}
             ]
         )
         return {"status": "SUCCESS", "message": response.choices[0].message.content}
