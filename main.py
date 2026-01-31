@@ -27,27 +27,24 @@ async def analyser_ecriture(file: UploadFile = File(...)):
     try:
         image_data = await file.read()
         
-        # Azure extrait le texte brut
+        # 1. Extraction du texte par Azure
         poller = document_client.begin_analyze_document("prebuilt-read", image_data)
         result = poller.result()
         texte_lu = " ".join([l.content for p in result.pages for l in p.lines])
 
-        # OpenAI en mode "Inspection de police"
+        # 2. OpenAI compare et affiche ce qu'il a lu
         response = client_openai.chat.completions.create(
             model="gpt-4o",
             messages=[
-                {"role": "system", "content": f"""Tu es un correcteur d'arabe extrêmement rigoureux. 
-                Voici la liste parfaite : {LISTE_OFFICIELLE}. 
-                Voici ce que tu dois corriger (texte extrait de la photo) : '{texte_lu}'.
+                {"role": "system", "content": f"""Tu es un correcteur strict. 
+                LISTE DE RÉFÉRENCE : {LISTE_OFFICIELLE}
                 
-                CONSIGNES STRICTES :
-                1. Compare chaque mot extrait avec le mot correspondant dans la liste.
-                2. Si un 'Tanwin' (double voyelle) manque, c'est une erreur.
-                3. Si une lettre est mal lue ou absente, signale-le.
-                4. Ne dis PAS 'parfait' ou 'excellent' si le texte lu est approximatif. 
-                5. Si le texte extrait est très court ou illisible, demande une photo plus nette.
-                6. Présente tes corrections sous forme de liste numérotée (1 à 10)."""},
-                {"role": "user", "content": "Analyse précisément mon écriture."}
+                MISSION :
+                1. Commence ta réponse par : 'TEXTE DÉTECTÉ SUR LA PHOTO : [insère ici le texte lu par Azure]'.
+                2. Ensuite, compare ce texte avec la LISTE DE RÉFÉRENCE.
+                3. Pour chaque mot, indique s'il est correct ou s'il y a une erreur (lettre, voyelle ou mot manquant).
+                4. Ne sois PAS complaisant. Si le texte détecté est différent de la référence, signale l'erreur."""},
+                {"role": "user", "content": f"Voici le texte brut extrait de la photo : '{texte_lu}'. Corrige-le par rapport à la liste officielle."}
             ]
         )
         return {"status": "SUCCESS", "message": response.choices[0].message.content}
