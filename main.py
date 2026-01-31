@@ -1,15 +1,21 @@
 import os
-import base64
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from azure.ai.formrecognizer import DocumentAnalysisClient
 from azure.core.credentials import AzureKeyCredential
 from openai import OpenAI
 
 app = FastAPI()
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
-# Connexion aux services (Clés configurées sur Render)
+# Autorise la connexion depuis Systeme.io
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Configuration via les variables d'environnement Render
 client_openai = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 document_client = DocumentAnalysisClient(
     endpoint=os.getenv("AZURE_ENDPOINT"), 
@@ -17,24 +23,23 @@ document_client = DocumentAnalysisClient(
 )
 
 @app.post("/analyser-ecriture")
-async def analyser_ecriture(file: UploadFile = File(...)):
+async def analyser_ecriture(file: UploadFile = File(...), phrases_cible: str = Form("هَذَا مَسْجِدٌ, هَذَا كِتَابٌ, هَذَا قَلَمٌ")):
     try:
         image_data = await file.read()
         
-        # 1. ANALYSE AZURE (Lecture chirurgicale de l'arabe)
+        # 1. Azure lit l'image
         poller = document_client.begin_analyze_document("prebuilt-read", image_data)
         result = poller.result()
         texte_extrait = " ".join([line.content for page in result.pages for line in page.lines])
 
-        # 2. DECISION OPENAI (Comparaison intelligente)
+        # 2. OpenAI compare et corrige
         response = client_openai.chat.completions.create(
             model="gpt-4o",
             messages=[
-                {"role": "system", "content": "Tu es un professeur d'arabe. Valide si les 10 phrases sont présentes. Sois indulgent sur le manuscrit mais strict sur les voyelles finales (tanwin)."},
-                {"role": "user", "content": f"Texte lu par l'OCR : {texte_extrait}. Liste cible : هَذَا مَسْجِدٌ, هَذَا كِتَابٌ, هَذَا قَلَمٌ, هَذَا مِفْتَاحٌ, هَذَا مَكْتَبٌ, هَذَا سَرِيرٌ, هَذَا كُرْسِيٌّ, هَذَا بَيْتٌ, هَذَا بَابٌ, هَذَا وَلَدٌ."}
-            ],
-            temperature=0
+                {"role": "system", "content": "Tu es un professeur d'arabe. Compare le texte lu avec la liste cible. Réponds de manière encourageante."},
+                {"role": "user", "content": f"Texte extrait : {texte_extrait}. Liste cible : {phrases_cible}"}
+            ]
         )
-        return response.choices[0].message.content
+        return {"status": "SUCCESS", "message": response.choices[0].message.content}
     except Exception as e:
         return {"status": "ERROR", "message": str(e)}
