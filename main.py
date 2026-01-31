@@ -7,7 +7,6 @@ from openai import OpenAI
 
 app = FastAPI()
 
-# Autorisation pour que Systeme.io puisse parler au serveur
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -15,14 +14,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialisation avec tes variables Render
 client_openai = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 document_client = DocumentAnalysisClient(
     endpoint=os.getenv("AZURE_ENDPOINT"), 
     credential=AzureKeyCredential(os.getenv("AZURE_KEY"))
 )
 
-# LA VÉRITÉ EST ICI : L'IA comparera la photo à ces mots uniquement
 LISTE_OFFICIELLE = "هَذَا مَسْجِدٌ, هَذَا كِتَابٌ, هَذَا قَلَمٌ, هَذَا مِفْتَاحٌ, هَذَا مَكْتَبٌ, هَذَا سَرِيرٌ, هَذَا كُرْسِيٌّ, هَذَا بَيْتٌ, هَذَا بَابٌ, هَذَا وَلَدٌ"
 
 @app.post("/analyser-ecriture")
@@ -30,17 +27,27 @@ async def analyser_ecriture(file: UploadFile = File(...)):
     try:
         image_data = await file.read()
         
-        # 1. Azure scanne les traits sur la photo
+        # Azure extrait le texte brut
         poller = document_client.begin_analyze_document("prebuilt-read", image_data)
         result = poller.result()
         texte_lu = " ".join([l.content for p in result.pages for l in p.lines])
 
-        # 2. OpenAI compare le texte lu avec la LISTE_OFFICIELLE
+        # OpenAI en mode "Inspection de police"
         response = client_openai.chat.completions.create(
             model="gpt-4o",
             messages=[
-                {"role": "system", "content": f"Tu es un professeur d'arabe. On vient de scanner une photo d'exercice. Voici les mots que l'élève devait écrire : {LISTE_OFFICIELLE}. Voici ce que j'ai lu sur sa photo : '{texte_lu}'. Liste précisément les erreurs (lettres manquantes ou harakats faux). Sois encourageant mais très précis sur la correction."},
-                {"role": "user", "content": "Corrige mon écriture s'il te plaît."}
+                {"role": "system", "content": f"""Tu es un correcteur d'arabe extrêmement rigoureux. 
+                Voici la liste parfaite : {LISTE_OFFICIELLE}. 
+                Voici ce que tu dois corriger (texte extrait de la photo) : '{texte_lu}'.
+                
+                CONSIGNES STRICTES :
+                1. Compare chaque mot extrait avec le mot correspondant dans la liste.
+                2. Si un 'Tanwin' (double voyelle) manque, c'est une erreur.
+                3. Si une lettre est mal lue ou absente, signale-le.
+                4. Ne dis PAS 'parfait' ou 'excellent' si le texte lu est approximatif. 
+                5. Si le texte extrait est très court ou illisible, demande une photo plus nette.
+                6. Présente tes corrections sous forme de liste numérotée (1 à 10)."""},
+                {"role": "user", "content": "Analyse précisément mon écriture."}
             ]
         )
         return {"status": "SUCCESS", "message": response.choices[0].message.content}
