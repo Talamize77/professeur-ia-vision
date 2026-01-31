@@ -15,11 +15,7 @@ app.add_middleware(
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-# Liste exacte attendue
-LISTE_PARFAITE = [
-    "هَذَا مَسْجِدٌ", "هَذَا كِتَابٌ", "هَذَا قَلَمٌ", "هَذَا مِفْتَاحٌ", "هَذَا مَكْتَبٌ",
-    "هَذَا سَرِيرٌ", "هَذَا كُرْسِيٌّ", "هَذَا بَيْتٌ", "هَذَا بَابٌ", "هَذَا وَلَدٌ"
-]
+LISTE_CIBLE = "1. هَذَا مَسْجِدٌ, 2. هَذَا كِتَابٌ, 3. هَذَا قَلَمٌ, 4. هَذَا مِفْتَاحٌ, 5. هَذَا مَكْتَبٌ, 6. هَذَا سَرِيرٌ, 7. هَذَا كُرْسِيٌّ, 8. هَذَا بَيْتٌ, 9. هَذَا بَابٌ, 10. هَذَا وَلَدٌ"
 
 @app.post("/analyser-ecriture")
 async def analyser_ecriture(file: UploadFile = File(...)):
@@ -27,35 +23,38 @@ async def analyser_ecriture(file: UploadFile = File(...)):
         image_bytes = await file.read()
         base64_image = base64.b64encode(image_bytes).decode('utf-8')
 
-        # ÉTAPE 1 : On demande à l'IA de recopier bêtement ce qu'elle voit
         response = client.chat.completions.create(
             model="gpt-4o",
             messages=[
                 {
                     "role": "system", 
-                    "content": "Tu es un scanner de texte. Recopie exactement le texte arabe que tu vois sur l'image, ligne par ligne. N'ajoute AUCUNE voyelle que tu ne vois pas clairement. Si un mot n'a pas de voyelle, écris-le sans voyelle."
+                    "content": f"""Tu es un professeur d'arabe qui corrige un examen.
+                    L'élève doit avoir écrit : {LISTE_CIBLE}.
+                    
+                    MÉTHODE DE CORRECTION :
+                    1. Pour chaque ligne, regarde d'abord le mot 'هَذَا'. Est-ce que la petite dague (alif khanjariya) est présente ?
+                    2. Regarde ensuite le nom. Est-ce que le double damma (tanwin) est présent à la fin ?
+                    3. Si un trait manque sur ta photo en haute définition, c'est FAUX.
+                    
+                    FORMAT DE RÉPONSE :
+                    Ligne X : [Verdict : CORRECT ou INCOMPLET]
+                    - Détail : (Explique précisément quel trait de voyelle manque)."""
                 },
                 {
                     "role": "user",
                     "content": [
-                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}", "detail": "high"}}
+                        {"type": "text", "text": "Regarde bien les voyelles sur chaque mot de cette photo."},
+                        {
+                            "type": "image_url", 
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{base64_image}",
+                                "detail": "high" 
+                            }
+                        }
                     ]
                 }
             ]
         )
-        
-        texte_extrait = response.choices[0].message.content.split('\n')
-        
-        # ÉTAPE 2 : Comparaison stricte par le code
-        resultats = []
-        for i, phrase_attendue in enumerate(LISTE_PARFAITE):
-            phrase_eleve = texte_extrait[i] if i < len(texte_extrait) else "Manquant"
-            if phrase_eleve.strip() == phrase_attendue.strip():
-                resultats.append(f"{i+1}. ✅ Parfait")
-            else:
-                resultats.append(f"{i+1}. ❌ Erreur : Tu as écrit '{phrase_eleve}' au lieu de '{phrase_attendue}'")
-
-        return {"status": "SUCCESS", "message": "\n".join(resultats)}
-        
+        return {"status": "SUCCESS", "message": response.choices[0].message.content}
     except Exception as e:
         return {"status": "ERROR", "message": str(e)}
