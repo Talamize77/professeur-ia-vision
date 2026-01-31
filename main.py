@@ -1,5 +1,5 @@
 import os
-from fastapi import FastAPI, UploadFile, File, Form
+from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from azure.ai.formrecognizer import DocumentAnalysisClient
 from azure.core.credentials import AzureKeyCredential
@@ -14,33 +14,32 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Utilisation de tes variables Render déjà configurées
+# Utilisation de tes variables Render
 client_openai = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 document_client = DocumentAnalysisClient(
     endpoint=os.getenv("AZURE_ENDPOINT"), 
     credential=AzureKeyCredential(os.getenv("AZURE_KEY"))
 )
 
+# LA LISTE OFFICIELLE REVIENT ICI POUR PLUS DE SÉCURITÉ
+LISTE_OFFICIELLE = "هَذَا مَسْجِدٌ, هَذَا كِتَابٌ, هَذَا قَلَمٌ, هَذَا مِفْتَاحٌ, هَذَا مَكْتَبٌ, هَذَا سَرِيرٌ, هَذَا كُرْسِيٌّ, هَذَا بَيْتٌ, هَذَا بَابٌ, هَذَا وَلَدٌ"
+
 @app.post("/analyser-ecriture")
-async def analyser_ecriture(file: UploadFile = File(...), phrases_cible: str = Form(...)):
+async def analyser_ecriture(file: UploadFile = File(...)):
     try:
         image_data = await file.read()
         
-        # Lecture par Azure
+        # 1. Azure lit la photo
         poller = document_client.begin_analyze_document("prebuilt-read", image_data)
         result = poller.result()
-        texte_extrait = " ".join([line.content for page in result.pages for line in page.lines])
+        texte_lu = " ".join([l.content for p in result.pages for l in p.lines])
 
-        # Correction STRICTE par OpenAI
+        # 2. OpenAI compare avec la liste fixe
         response = client_openai.chat.completions.create(
             model="gpt-4o",
             messages=[
-                {"role": "system", "content": """Tu es un correcteur d'arabe strict. 
-                1. Analyse le texte extrait de la photo par rapport à la liste cible.
-                2. Si des mots manquent ou sont mal écrits (fautes de harakats ou de lettres), liste précisément les erreurs.
-                3. Ne dis JAMAIS 'Bravo' s'il y a des erreurs.
-                4. Sois court et précis. Si tout est parfait, réponds juste 'Excellent, tout est correct'."""},
-                {"role": "user", "content": f"Texte lu sur la photo : {texte_extrait}. Liste officielle à vérifier : {phrases_cible}"}
+                {"role": "system", "content": f"Tu es un prof d'arabe. Voici les mots corrects : {LISTE_OFFICIELLE}. Compare avec ce que l'élève a écrit : {texte_lu}. Sois précis sur les erreurs de lettres ou de harakats."},
+                {"role": "user", "content": "Analyse ma photo."}
             ]
         )
         return {"status": "SUCCESS", "message": response.choices[0].message.content}
