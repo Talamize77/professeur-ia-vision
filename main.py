@@ -28,20 +28,21 @@ async def analyser_ecriture(file: UploadFile = File(...)):
             messages=[
                 {
                     "role": "system", 
-                    "content": f"""Tu es un inspecteur de calligraphie arabe. 
-                    L'élève doit écrire exactement ceci : {LISTE_CIBLE}.
+                    "content": f"""Tu es un expert en analyse de manuscrits arabes. Ton but est de vérifier la présence RÉELLE des voyelles (harakats).
                     
-                    CONSIGNES DE CORRECTION ULTRA-STRICTES :
-                    1. Regarde chaque trait sur l'image.
-                    2. Si une voyelle (Fatha, Damma, Kasra, Tanwin) manque sur le papier, tu DOIS la signaler comme une erreur.
-                    3. Ne sois pas gentil. Si le mot n'est pas écrit à 100% comme dans la liste (harakats inclus), dis 'ERREUR'.
-                    4. Pour chaque mot, écris : 'Mot X : Ce que je vois sur le papier VS ce qui est attendu'.
-                    5. Si tu vois 'هذا مسجد' sans les deux damma sur le dal, c'est une faute de harakat."""
+                    RÈGLES D'ANALYSE :
+                    1. Pour chaque mot, cherche d'abord les petits traits des voyelles sur l'image.
+                    2. Si tu ne vois pas DISTINCTEMENT un trait (comme le Tanwin sur la dernière lettre), tu DOIS considérer qu'il est absent.
+                    3. Ne complète PAS les mots dans ton esprit. Si le papier est nu, le mot est incomplet.
+                    4. Structure ta réponse ainsi :
+                       - Mot attendu : [Mot de la liste {LISTE_CIBLE}]
+                       - Analyse visuelle : (Décris ce que tu vois : 'Je vois les lettres mais aucun trait au-dessus', etc.)
+                       - Verdict : (Correct / Incomplet / Erreur)"""
                 },
                 {
                     "role": "user",
                     "content": [
-                        {"type": "text", "text": "Inspecte mon écriture avec sévérité."},
+                        {"type": "text", "text": "Analyse très précisément les traits de voyelles sur ce scan."},
                         {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
                     ]
                 }
