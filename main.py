@@ -1,8 +1,7 @@
 import os
+import base64
 from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
-from azure.ai.formrecognizer import DocumentAnalysisClient
-from azure.core.credentials import AzureKeyCredential
 from openai import OpenAI
 
 app = FastAPI()
@@ -14,39 +13,45 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-client_openai = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-document_client = DocumentAnalysisClient(
-    endpoint=os.getenv("AZURE_ENDPOINT"), 
-    credential=AzureKeyCredential(os.getenv("AZURE_KEY"))
-)
+# On utilise uniquement OpenAI pour la vision et la correction
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 LISTE_OFFICIELLE = "هَذَا مَسْجِدٌ, هَذَا كِتَابٌ, هَذَا قَلَمٌ, هَذَا مِفْتَاحٌ, هَذَا مَكْتَبٌ, هَذَا سَرِيرٌ, هَذَا كُرْسِيٌّ, هَذَا بَيْتٌ, هَذَا بَابٌ, هَذَا وَلَدٌ"
 
 @app.post("/analyser-ecriture")
 async def analyser_ecriture(file: UploadFile = File(...)):
     try:
-        image_data = await file.read()
-        
-        # 1. Extraction du texte par Azure
-        poller = document_client.begin_analyze_document("prebuilt-read", image_data)
-        result = poller.result()
-        texte_lu = " ".join([l.content for p in result.pages for l in p.lines])
+        # Lecture et encodage de l'image pour l'IA
+        image_bytes = await file.read()
+        base64_image = base64.b64encode(image_bytes).decode('utf-8')
 
-        # 2. OpenAI compare et affiche ce qu'il a lu
-        response = client_openai.chat.completions.create(
+        # L'IA regarde l'image et corrige en même temps
+        response = client.chat.completions.create(
             model="gpt-4o",
             messages=[
-                {"role": "system", "content": f"""Tu es un correcteur strict. 
-                LISTE DE RÉFÉRENCE : {LISTE_OFFICIELLE}
-                
-                MISSION :
-                1. Commence ta réponse par : 'TEXTE DÉTECTÉ SUR LA PHOTO : [insère ici le texte lu par Azure]'.
-                2. Ensuite, compare ce texte avec la LISTE DE RÉFÉRENCE.
-                3. Pour chaque mot, indique s'il est correct ou s'il y a une erreur (lettre, voyelle ou mot manquant).
-                4. Ne sois PAS complaisant. Si le texte détecté est différent de la référence, signale l'erreur."""},
-                {"role": "user", "content": f"Voici le texte brut extrait de la photo : '{texte_lu}'. Corrige-le par rapport à la liste officielle."}
-            ]
+                {
+                    "role": "system", 
+                    "content": f"""Tu es un professeur d'arabe expert. 
+                    L'élève doit écrire ces phrases : {LISTE_OFFICIELLE}.
+                    Regarde l'image envoyée et compare son écriture manuscrite avec la liste.
+                    
+                    CONSIGNES :
+                    1. Liste les 10 phrases.
+                    2. Pour chaque phrase, dis si elle est correcte ou s'il y a une erreur de lettre ou de voyelle (harakat).
+                    3. Sois très strict sur les harakats.
+                    4. Réponds en français avec les mots arabes cités."""
+                },
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "Voici mon exercice d'écriture, peux-tu le corriger ?"},
+                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
+                    ]
+                }
+            ],
+            max_tokens=1000
         )
+        
         return {"status": "SUCCESS", "message": response.choices[0].message.content}
     except Exception as e:
         return {"status": "ERROR", "message": str(e)}
