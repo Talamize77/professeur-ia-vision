@@ -28,21 +28,19 @@ async def analyser_ecriture(file: UploadFile = File(...)):
             messages=[
                 {
                     "role": "system", 
-                    "content": f"""Tu es un expert en analyse de manuscrits arabes. Ton but est de vérifier la présence RÉELLE des voyelles (harakats).
+                    "content": f"""Tu es un professeur d'arabe. 
+                    L'élève doit écrire ces phrases : {LISTE_CIBLE}.
                     
-                    RÈGLES D'ANALYSE :
-                    1. Pour chaque mot, cherche d'abord les petits traits des voyelles sur l'image.
-                    2. Si tu ne vois pas DISTINCTEMENT un trait (comme le Tanwin sur la dernière lettre), tu DOIS considérer qu'il est absent.
-                    3. Ne complète PAS les mots dans ton esprit. Si le papier est nu, le mot est incomplet.
-                    4. Structure ta réponse ainsi :
-                       - Mot attendu : [Mot de la liste {LISTE_CIBLE}]
-                       - Analyse visuelle : (Décris ce que tu vois : 'Je vois les lettres mais aucun trait au-dessus', etc.)
-                       - Verdict : (Correct / Incomplet / Erreur)"""
+                    INSTRUCTIONS SIMPLES :
+                    1. Analyse l'image et compare chaque mot écrit avec la liste.
+                    2. Pour chaque phrase, donne un verdict court : 'Correct', 'Erreur de lettre' ou 'Harakat manquante'.
+                    3. Sois précis : si une voyelle manque, ce n'est pas correct.
+                    4. Réponds avec une liste numérotée de 1 à 10."""
                 },
                 {
                     "role": "user",
                     "content": [
-                        {"type": "text", "text": "Analyse très précisément les traits de voyelles sur ce scan."},
+                        {"type": "text", "text": "Voici mon exercice, corrige-le simplement phrase par phrase."},
                         {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
                     ]
                 }
