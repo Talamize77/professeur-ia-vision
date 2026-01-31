@@ -7,7 +7,6 @@ from openai import OpenAI
 
 app = FastAPI()
 
-# Autorise la connexion depuis Systeme.io
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -15,7 +14,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Configuration via les variables d'environnement Render
+# Utilisation de tes variables Render déjà configurées
 client_openai = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 document_client = DocumentAnalysisClient(
     endpoint=os.getenv("AZURE_ENDPOINT"), 
@@ -23,21 +22,25 @@ document_client = DocumentAnalysisClient(
 )
 
 @app.post("/analyser-ecriture")
-async def analyser_ecriture(file: UploadFile = File(...), phrases_cible: str = Form("هَذَا مَسْجِدٌ, هَذَا كِتَابٌ, هَذَا قَلَمٌ")):
+async def analyser_ecriture(file: UploadFile = File(...), phrases_cible: str = Form(...)):
     try:
         image_data = await file.read()
         
-        # 1. Azure lit l'image
+        # Lecture par Azure
         poller = document_client.begin_analyze_document("prebuilt-read", image_data)
         result = poller.result()
         texte_extrait = " ".join([line.content for page in result.pages for line in page.lines])
 
-        # 2. OpenAI compare et corrige
+        # Correction STRICTE par OpenAI
         response = client_openai.chat.completions.create(
             model="gpt-4o",
             messages=[
-                {"role": "system", "content": "Tu es un professeur d'arabe. Compare le texte lu avec la liste cible. Réponds de manière encourageante."},
-                {"role": "user", "content": f"Texte extrait : {texte_extrait}. Liste cible : {phrases_cible}"}
+                {"role": "system", "content": """Tu es un correcteur d'arabe strict. 
+                1. Analyse le texte extrait de la photo par rapport à la liste cible.
+                2. Si des mots manquent ou sont mal écrits (fautes de harakats ou de lettres), liste précisément les erreurs.
+                3. Ne dis JAMAIS 'Bravo' s'il y a des erreurs.
+                4. Sois court et précis. Si tout est parfait, réponds juste 'Excellent, tout est correct'."""},
+                {"role": "user", "content": f"Texte lu sur la photo : {texte_extrait}. Liste officielle à vérifier : {phrases_cible}"}
             ]
         )
         return {"status": "SUCCESS", "message": response.choices[0].message.content}
