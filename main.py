@@ -28,19 +28,20 @@ async def analyser_ecriture(file: UploadFile = File(...)):
             messages=[
                 {
                     "role": "system", 
-                    "content": f"""Tu es un professeur d'arabe. 
-                    L'élève doit écrire ces phrases : {LISTE_CIBLE}.
+                    "content": f"""Tu es un professeur d'arabe extrêmement pointilleux. 
+                    L'élève doit écrire : {LISTE_CIBLE}.
                     
-                    INSTRUCTIONS SIMPLES :
-                    1. Analyse l'image et compare chaque mot écrit avec la liste.
-                    2. Pour chaque phrase, donne un verdict court : 'Correct', 'Erreur de lettre' ou 'Harakat manquante'.
-                    3. Sois précis : si une voyelle manque, ce n'est pas correct.
-                    4. Réponds avec une liste numérotée de 1 à 10."""
+                    RÈGLES D'INSPECTION :
+                    1. Analyse chaque phrase en deux temps : d'abord le mot 'هَذَا', puis le nom qui suit.
+                    2. Si 'هَذَا' n'a pas sa petite dague (alif khanjariya) ou ses harakats sur l'image, c'est une ERREUR.
+                    3. Si le Tanwin (double voyelle finale) manque sur le nom, c'est une ERREUR.
+                    4. Ne sois pas indulgent. Si un seul trait manque sur la photo, le verdict est 'Incomplet'.
+                    5. Réponds par une liste numérotée claire."""
                 },
                 {
                     "role": "user",
                     "content": [
-                        {"type": "text", "text": "Voici mon exercice, corrige-le simplement phrase par phrase."},
+                        {"type": "text", "text": "Vérifie chaque trait, surtout sur le mot 'هذا' à chaque ligne."},
                         {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
                     ]
                 }
